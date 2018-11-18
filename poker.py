@@ -104,8 +104,9 @@ def playerOrder(stillPlaying, player):
     wrapAround = stillPlaying[:stillPlaying.index(player)+1]
     return afterBlind + wrapAround
 
-def blinds(stillPlaying):
+def blinder(stillPlaying):
     global POT
+    global BLINDNUMBER
     if BLINDNUMBER>= len(stillPlaying):
         BLINDNUMBER-= len(stillPlaying)
     small = stillPlaying[BLINDNUMBER -1].bet(MINUMUMBET)
@@ -126,13 +127,13 @@ def bet(stillPlaying, blinds = False):
         return stillPlaying
 
     if blinds:
-        blinds(stillPlaying)
+        blinder(stillPlaying)
 
     playOrder = playerOrder(stillPlaying, stillPlaying[BLINDNUMBER])
     while not finishBetting(stillPlaying, roundBetting):
         for player in playOrder:
             action = predictAction(player,community,roundBetting,player.getPosition()-1, stillPlaying)
-            if round(action/MINUMUMBET)*MINUMUMBET == 0:
+            if round(action*player.getMoney()/MINUMUMBET)*MINUMUMBET == 0:
                 roundBetting.append(0)
                 #print(any([not i==0 for i in roundBetting]))
                 #print([i for i in roundBetting])
@@ -146,7 +147,7 @@ def bet(stillPlaying, blinds = False):
                 if len(stillPlaying) ==1:
                     break
             else:
-                betAmount = round(action/MINUMUMBET)*MINUMUMBET
+                betAmount = round(action*player.getMoney()/MINUMUMBET)*MINUMUMBET
                 #print('betting', betAmount, 'player', player.getPosition())
                 maxBet = max([player.betInRound() for player in stillPlaying])
                 if not(predictAction(player,community,roundBetting,player.getPosition()-1, stillPlaying, True)) and (len(roundBetting) > 0 and player.betInRound() < max([others.betInRound() for others in stillPlaying])):
@@ -267,9 +268,9 @@ while True:
             CompleteModel.add(Dense(5, input_shape= (5,)))
             CompleteModel.add(Activation('softplus'))
             CompleteModel.add(Dense(10, input_shape= (5,)))
-            CompleteModel.add(Activation('sigmoid'))
-            CompleteModel.add(Dense(2, input_shape= (10,)))
             CompleteModel.add(Activation('relu'))
+            CompleteModel.add(Dense(2, input_shape= (10,)))
+            CompleteModel.add(Activation('sigmoid'))
 
             CompleteModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
 
@@ -328,7 +329,7 @@ while True:
 
     hands = 0
 
-    while len(players) > 1 and hands <= 100:
+    while len(players) > 1 and hands <= 300:
         stillPlaying = [player for player in players if player.getMoney() >0]
         #print('numbers of players still playing:', len(stillPlaying))
         for i in range(len(stillPlaying)):
