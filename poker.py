@@ -33,10 +33,6 @@ loadSaves = False
 
 
 def betSame(list):
-    #print(set(list))
-    #for player in stillPlaying:
-    #    print('player', player.getPosition(), 'has bet', player.betInRound(), 'and has money', player.getMoney(), "is all in:", player.allIn())
-
     return len(set(list))<=1
 
 def savePool():
@@ -61,44 +57,64 @@ def finishBetting(stillPlaying, bets):
     else:
         return True
 
-def predictAction(pocket, community, bets, modelNum, checkallIn = False):
+def predictNum(pocket, community, modelNum):
     communityNums = [0 for i in range(min(len(community),5),5)]
     communityNums += [card.getNumber() for card in community]
     neuralInputNums = np.asarray([card.getNumber() for card in pocket.getCards()] + communityNums)
     neuralInputNums = np.atleast_2d(neuralInputNums)
+    return currentPoolNum[modelNum].predict(neuralInputNums,1)[0]
+
+def predictSuit(pocket, community, modelNum):
     communitySuit = [0 for i in range(min(len(community),5),5)]
     communitySuit += [card.getSuit() for card in community]
     neuralInputSuit = np.asarray([card.getSuit() for card in pocket.getCards()]+communitySuit)
     neuralInputSuit = np.atleast_2d(neuralInputSuit)
+    return currentPoolSuit[modelNum].predict(neuralInputSuit,1)[0]
+
+def predictfromBet(bets,modelNum):
     neuralInputBets = [0 for i in range(min(len(bets),6),6)]
     neuralInputBets += [bets[-i] for i in range(1,7) if i<=len(bets)]
     neuralInputBets = np.asarray(neuralInputBets)
     neuralInputBets = neuralInputBets.reshape((1,6,1))
+    return currentPoolBetting[modelNum].predict(neuralInputBets,1)[0]
 
-    finalInputs = [pocket.getMoney(),currentPoolNum[modelNum].predict(neuralInputNums,1)[0], currentPoolSuit[modelNum].predict(neuralInputSuit,1)[0], currentPoolBetting[modelNum].predict(neuralInputBets,1)[0]]
-    finalInputs = np.asarray(finalInputs)
+def predictComplete(money, preNum, preSuit, preBet, maxBet, modelNum):
+    inputs = (money, preNum, preSuit, preBet, maxBet)
+    inputs = np.asarray(inputs)
+    inputs = np.atleast_2d(inputs)
+    return currentPoolComplete[modelNum].predict(inputs,1)[0]
 
-    #print(finalInputs)
-    finalInputs = np.atleast_2d(finalInputs)
+def predictAction(pocket, community, bets, modelNum, players, checkallIn = False ):
 
-    #print(finalInputs)
+    preNum = predictNum(pocket, community, modelNum)
+    preSuit = predictSuit(pocket, community, modelNum)
+    preBet = predictfromBet(bets, modelNum)
+    complete = predictComplete(pocket.getMoney(),preNum, preSuit, preBet, max([player.betInRound() for player in players]), modelNum)
 
-    output = currentPoolComplete[modelNum].predict(finalInputs,1)[0]
-    #print(np.asarray(currentPoolComplete)[modelNum].predict(finalInputs,1).shape)
-    allIn = currentPoolComplete[modelNum].predict(finalInputs,1)[0][1]
-    if allIn>.75:
-        ##print('ALL IN')
+    allIn = complete[1]
+    if allIn>.85:
         allIn = True
-
     if checkallIn:
         return allIn
 
-    return output[0]
+    return complete[0]
 
 def playerOrder(stillPlaying, player):
     afterBlind = stillPlaying[stillPlaying.index(player)+1:]
     wrapAround = stillPlaying[:stillPlaying.index(player)+1]
     return afterBlind + wrapAround
+
+def blinds(stillPlaying):
+    global POT
+    if BLINDNUMBER>= len(stillPlaying):
+        BLINDNUMBER-= len(stillPlaying)
+    small = stillPlaying[BLINDNUMBER -1].bet(MINUMUMBET)
+    roundBetting.append(small)
+    big = stillPlaying[BLINDNUMBER].bet(MINUMUMBET*2)
+    roundBetting.append(big)
+
+    POT+= small
+    POT+= big
 
 def bet(stillPlaying, blinds = False):
     global POT
@@ -110,24 +126,13 @@ def bet(stillPlaying, blinds = False):
         return stillPlaying
 
     if blinds:
-
-        if BLINDNUMBER>= len(stillPlaying):
-            BLINDNUMBER-= len(stillPlaying)
-        small = stillPlaying[BLINDNUMBER -1].bet(MINUMUMBET)
-        #print("small blind money:", stillPlaying[BLINDNUMBER -1].betInRound(), small)
-        roundBetting.append(small)
-        big = stillPlaying[BLINDNUMBER].bet(MINUMUMBET*2)
-        #print("big blind money:", stillPlaying[BLINDNUMBER].betInRound(), big)
-        roundBetting.append(big)
-
-        POT+= small
-        POT+= big
-        #print('pot size of', POT)
+        blinds(stillPlaying)
 
     playOrder = playerOrder(stillPlaying, stillPlaying[BLINDNUMBER])
     while not finishBetting(stillPlaying, roundBetting):
         for player in playOrder:
-            if round(predictAction(player,community,roundBetting,player.getPosition()-1)*player.getMoney()/MINUMUMBET)*MINUMUMBET == 0:
+            action = predictAction(player,community,roundBetting,player.getPosition()-1, stillPlaying)
+            if round(action/MINUMUMBET)*MINUMUMBET == 0:
                 roundBetting.append(0)
                 #print(any([not i==0 for i in roundBetting]))
                 #print([i for i in roundBetting])
@@ -141,10 +146,10 @@ def bet(stillPlaying, blinds = False):
                 if len(stillPlaying) ==1:
                     break
             else:
-                betAmount = round(predictAction(player,community,roundBetting,player.getPosition()-1)*player.getMoney()/MINUMUMBET)*MINUMUMBET
+                betAmount = round(action/MINUMUMBET)*MINUMUMBET
                 #print('betting', betAmount, 'player', player.getPosition())
                 maxBet = max([player.betInRound() for player in stillPlaying])
-                if not(predictAction(player,community,roundBetting,player.getPosition()-1, True)) and (len(roundBetting) > 0 and player.betInRound() < max([others.betInRound() for others in stillPlaying])):
+                if not(predictAction(player,community,roundBetting,player.getPosition()-1, stillPlaying, True)) and (len(roundBetting) > 0 and player.betInRound() < max([others.betInRound() for others in stillPlaying])):
                     player.fold()
                     stillPlaying.remove(player)
                     playOrder.remove(player)
@@ -199,10 +204,6 @@ def model_crossover(option = 1):
 
 def model_mutate(weights, print1 = False):
     # mutate each models weights
-
-    '''if print1:
-        print('before',weights)
-'''
     if True:
         for i in range(len(weights)):
             for j in range(len(weights[i])):
@@ -216,16 +217,6 @@ def model_mutate(weights, print1 = False):
                     if random.uniform(0,1) > .85:
                         change = random.uniform(-0.5,0.5)
                         weights[i][j] += change
-
-    '''else:
-        for i in range(len(weights)):
-            for j in range(len(weights[i])):
-
-                for k in range(len(weights[i][j])):
-                    if random.uniform(0,1) > .85:
-                        change = random.uniform(-0.5,0.5)
-                        weights[i][j][k] += change
-'''
     return weights
 
 once = False
@@ -273,12 +264,12 @@ while True:
             currentPoolBetting.append(BettingModel)
 
             CompleteModel = Sequential()
-            CompleteModel.add(Dense(5, input_shape= (4,)))
+            CompleteModel.add(Dense(5, input_shape= (5,)))
             CompleteModel.add(Activation('softplus'))
             CompleteModel.add(Dense(10, input_shape= (5,)))
             CompleteModel.add(Activation('sigmoid'))
             CompleteModel.add(Dense(2, input_shape= (10,)))
-            CompleteModel.add(Activation('sigmoid'))
+            CompleteModel.add(Activation('relu'))
 
             CompleteModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
 
