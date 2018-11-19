@@ -1,4 +1,6 @@
 import random
+import pygame as pg
+import os
 
 def cardNum(card):
     return card.getNumber()
@@ -45,11 +47,27 @@ class Cards():
     def __init__(self, number, suit):
         self._number = number
         self._suit = suit
+        self._png = self.getSpriteName()
 
     def getNumber(self, maxA = False):
         if maxA and self._number == 1 :
             return 14
         return self._number
+
+    def dealt(self, position):
+
+        self.image = pg.transform.scale(pg.image.load(self._png), (100,145))
+
+        #get card rectangle
+        self.rect = self.image.get_rect()
+
+        #position at different positions
+        self.rect.centerx = position.x
+        self.rect.centery = position.y
+
+    def finishHand(self):
+        self.image.fill(transparent)
+
     '''
     return suit
     1 -> diamond
@@ -57,6 +75,40 @@ class Cards():
     3 -> heart
     4 -> spade
     '''
+
+    def getSpriteName(self):
+
+        current_path = os.path.dirname(__file__)
+        resoucePath = os.path.join(current_path, 'PNG-cards-1.3')
+
+        if 1 < self._number < 11:
+            name = str(self._number)
+        elif self._number == 1:
+            name = 'ace'
+        elif self._number == 11:
+            name = 'jack'
+        elif self._number == 12:
+            name = 'queen'
+        elif self._number == 13:
+            name = 'king'
+
+        name += '_of_'
+
+        if self._suit ==1:
+            name += 'diamonds'
+        elif self._suit == 2:
+            name += 'clubs'
+        elif self._suit == 3:
+            name += 'hearts'
+        elif self._suit == 4:
+            name += 'spades'
+
+        name +='.png'
+
+        imagePath = os.path.join(resoucePath, name)
+
+        return imagePath
+
     def getSuit(self):
         return self._suit
 

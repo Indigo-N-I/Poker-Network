@@ -3,8 +3,8 @@ import random
 from random import randint
 import sys
 
-#import pygame
-#from pygame.locals import *
+import pygame as pg
+from pygame.locals import *
 
 import numpy as np
 
@@ -220,62 +220,63 @@ def model_mutate(weights, print1 = False):
                         weights[i][j] += change
     return weights
 
+def createWeights():
+    createNumWeight()
+    createBetWeights()
+    createSuitWeight()
+    createCompleteWeights()
+
+def createNumWeight():
+    NumModel = Sequential()
+    NumModel.add(Dense(4, input_shape=(7,)))
+    NumModel.add(Activation('softmax'))
+    NumModel.add(Dense(15, input_shape=(3,)))
+    NumModel.add(Activation('relu'))
+    NumModel.add(Dense(1, input_shape=(15,)))
+    NumModel.add(Activation('sigmoid'))
+
+    NumModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
+    currentPoolNum.append(NumModel)
+
+def createSuitWeight():
+    SuitModel = Sequential()
+    SuitModel.add(Dense(4, input_shape=(7,)))
+    SuitModel.add(Activation('relu'))
+    SuitModel.add(Dense(15, input_shape=(4,)))
+    SuitModel.add(Activation('relu'))
+    SuitModel.add(Dense(1, input_shape=(15,)))
+    SuitModel.add(Activation('sigmoid'))
+
+    SuitModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
+    currentPoolSuit.append(SuitModel)
+
+def createBetWeights():
+    BettingModel = Sequential()
+    BettingModel.add(LSTM(15, input_shape=(6,1,)))
+    BettingModel.add(Dense(1))
+    BettingModel.add(Activation('sigmoid'))
+    BettingModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
+
+    currentPoolBetting.append(BettingModel)
+
+def createCompleteWeights():
+        CompleteModel = Sequential()
+        CompleteModel.add(Dense(5, input_shape= (5,)))
+        CompleteModel.add(Activation('softplus'))
+        CompleteModel.add(Dense(10, input_shape= (5,)))
+        CompleteModel.add(Activation('relu'))
+        CompleteModel.add(Dense(2, input_shape= (10,)))
+        CompleteModel.add(Activation('sigmoid'))
+
+        CompleteModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
+        currentPoolComplete.append(CompleteModel)
+
 once = False
 gen = 1
 
 while True:
     for i in range(numPlayers):
-
-        if len(winners) <2:
-            NumModel = Sequential()
-            NumModel.add(Dense(4, input_shape=(7,)))
-            NumModel.add(Activation('softmax'))
-            NumModel.add(Dense(15, input_shape=(3,)))
-            NumModel.add(Activation('relu'))
-            NumModel.add(Dense(1, input_shape=(15,)))
-            NumModel.add(Activation('sigmoid'))
-
-            NumModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
-            currentPoolNum.append(NumModel)
-
-            SuitModel = Sequential()
-            SuitModel.add(Dense(4, input_shape=(7,)))
-            SuitModel.add(Activation('relu'))
-            SuitModel.add(Dense(15, input_shape=(4,)))
-            SuitModel.add(Activation('relu'))
-            SuitModel.add(Dense(1, input_shape=(15,)))
-            SuitModel.add(Activation('sigmoid'))
-            SuitModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
-            currentPoolSuit.append(SuitModel)
-
-            BettingModel = Sequential()
-
-            BettingModel.add(LSTM(15, input_shape=(6,1,)))
-
-            BettingModel.add(Dense(1))
-            BettingModel.add(Activation('sigmoid'))
-
-            BettingModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
-
-            '''if not once:
-                print('normal weights:', NumModel.get_weights())
-                print('lstm weights:', BettingModel.get_weights())
-                once = True
-'''
-            currentPoolBetting.append(BettingModel)
-
-            CompleteModel = Sequential()
-            CompleteModel.add(Dense(5, input_shape= (5,)))
-            CompleteModel.add(Activation('softplus'))
-            CompleteModel.add(Dense(10, input_shape= (5,)))
-            CompleteModel.add(Activation('relu'))
-            CompleteModel.add(Dense(2, input_shape= (10,)))
-            CompleteModel.add(Activation('sigmoid'))
-
-            CompleteModel.compile(loss = 'mse', optimizer = 'adam', metrics=['accuracy'])
-
-
-            currentPoolComplete.append(CompleteModel)
+        createWeights()
 
         if gen>=3:
             for i in range(2):
@@ -438,3 +439,5 @@ while True:
         dedParent = randint(0,1)
         winners[dedParent] = [currentPoolNum[playerNumber-1], currentPoolSuit[playerNumber-1], currentPoolBetting[playerNumber-1], currentPoolComplete[playerNumber-1]]
         savePool()
+
+    currentPoolNum.clear()
